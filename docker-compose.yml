@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  elasticsearch:
+    image: elasticsearch:v0.1
+    build: ./elasticsearch
+    ports:
+      - "9300:9300"
+  logstash:
+    image: logstash:v0.3
+    ports:
+      - "9200:9200"
+    environment:
+      - ELASTIC_SEARCH_HOST=http://elasticsearch:9200
