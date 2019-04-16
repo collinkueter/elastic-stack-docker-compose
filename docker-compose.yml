@@ -1,13 +1,64 @@
-version: "3"
+version: "3.6"
 
 services:
   elasticsearch:
-    image: elasticsearch:latest
-    build: ./elasticsearch
-    ports:
-      - 9200:9200
+    image: docker.elastic.co/elasticsearch/elasticsearch:${TAG}
+    container_name: elasticsearch
+    ports: ["9200:9200"]
+    networks: ["stack"]
+    volumes:
+      - "es_data:/usr/share/elasticsearch/data"
+    secrets:
+      - source: elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null; if [[ $$? == 52 ]]; then echo 0; else echo 1; fi
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${TAG}
+    container_name: kibana
+    ports: ["5601:5601"]
+    networks: ["stack"]
+    depends_on: ["elasticsearch"]
+    secrets:
+      - source: kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+    healthcheck:
+      test: curl -s http://localhost:5601 >/dev/null; if [[ $$? == 52 ]]; then echo 0; else echo 1; fi
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   logstash:
-    image: logstash:latest
-    build: ./logstash
-    depends_on:
-      - elasticsearch
+    image: docker.elastic.co/logstash/logstash:${TAG}
+    container_name: logstash
+    networks: ["stack"]
+    depends_on: ["elasticsearch"]
+    secrets:
+      - source: logstash.conf
+        target: /usr/share/logstash/pipeline/logstash.conf
+      - source: logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+    healthcheck:
+      test: bin/logstash -t
+      interval: 60s
+      timeout: 50s
+      retries: 5
+
+networks: { stack: {} }
+# use docker volume to persist Elastic Search data outside of a container.
+volumes:
+  es_data:
+
+secrets:
+  elasticsearch.yml:
+    file: ./elasticsearch/elasticsearch.yml
+  kibana.yml:
+    file: ./kibana/kibana.yml
+  logstash.yml:
+    file: ./logstash/config/logstash.yml
+  logstash.conf:
+    file: ./logstash/pipeline/logstash.conf
